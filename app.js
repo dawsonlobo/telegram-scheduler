@@ -122,7 +122,7 @@ function validateScheduleConfig(schedule) {
 
     if (!isValidTime(window.start) || !isValidTime(window.end)) {
       throw new Error(
-        `Invalid window time. Expected HH:mm, received start=${window.start}, end=${window.end}`
+        `Invalid window time. Expected HH:mm, received start=${window.start}, end=${window.end}`,
       );
     }
 
@@ -132,14 +132,12 @@ function validateScheduleConfig(schedule) {
 
     if (!window.templateId) {
       throw new Error(
-        `Window for user ${window.userId} must contain templateId`
+        `Window for user ${window.userId} must contain templateId`,
       );
     }
 
     if (!window.groupId) {
-      throw new Error(
-        `Window for user ${window.userId} must contain groupId`
-      );
+      throw new Error(`Window for user ${window.userId} must contain groupId`);
     }
   }
 
@@ -155,7 +153,7 @@ function validateScheduleConfig(schedule) {
       max < min
     ) {
       throw new Error(
-        "randomDelayMinutes must contain valid non-negative min/max values"
+        "randomDelayMinutes must contain valid non-negative min/max values",
       );
     }
   }
@@ -181,11 +179,7 @@ async function initializeConnection(user) {
 
   console.log(`Initializing Telegram connection: ${user.sessionId}`);
 
-  const client = await loginTelegram(
-    user.sessionId,
-    user.appId,
-    user.appHash
-  );
+  const client = await loginTelegram(user.sessionId, user.appId, user.appHash);
 
   if (!client) {
     throw new Error(`Telegram login failed for user ${user._id}`);
@@ -206,13 +200,9 @@ async function initializeConnection(user) {
 // ======================================================
 
 async function initializeActiveUsers() {
-  const users = await usersCollection
-    .find({ isActive: true })
-    .toArray();
+  const users = await usersCollection.find({ isActive: true }).toArray();
 
-  const activeUserIds = new Set(
-    users.map((user) => user._id.toString())
-  );
+  const activeUserIds = new Set(users.map((user) => user._id.toString()));
 
   for (const user of users) {
     const userId = user._id.toString();
@@ -244,13 +234,11 @@ async function initializeActiveUsers() {
 
       connections.set(userId, connection);
 
-      console.log(
-        `Connection initialized: ${user.username ?? userId}`
-      );
+      console.log(`Connection initialized: ${user.username ?? userId}`);
     } catch (error) {
       console.error(
         `Connection initialization failed for ${user.username ?? userId}:`,
-        error
+        error,
       );
 
       // Do not keep a broken connection in the cache.
@@ -390,9 +378,7 @@ function isWindowActive(window, now = new Date()) {
 }
 
 function getActiveWindows(scheduleConfig, now = new Date()) {
-  return scheduleConfig.windows.filter((window) =>
-    isWindowActive(window, now)
-  );
+  return scheduleConfig.windows.filter((window) => isWindowActive(window, now));
 }
 
 // ======================================================
@@ -455,7 +441,7 @@ function getNextWindowStart(scheduleConfig, reference = new Date()) {
   const currentMinutes = getCurrentMinutes(now);
 
   const windows = [...scheduleConfig.windows].sort(
-    (a, b) => getMinutes(a.start) - getMinutes(b.start)
+    (a, b) => getMinutes(a.start) - getMinutes(b.start),
   );
 
   // A currently active window has already started, so its next
@@ -523,11 +509,7 @@ function getIntervalMs(scheduleConfig) {
 // A stored lastRunAt is never moved backwards.
 // ======================================================
 
-function getNextAllowedRun(
-  lastRunAt,
-  scheduleConfig,
-  randomDelayMinutes = 0
-) {
+function getNextAllowedRun(lastRunAt, scheduleConfig, randomDelayMinutes = 0) {
   if (!lastRunAt) {
     return new Date();
   }
@@ -541,7 +523,7 @@ function getNextAllowedRun(
   return new Date(
     lastRun.getTime() +
       getIntervalMs(scheduleConfig) +
-      randomDelayMinutes * 60 * 1000
+      randomDelayMinutes * 60 * 1000,
   );
 }
 
@@ -552,14 +534,11 @@ function getNextAllowedRun(
 async function updateLastRunAt(userId) {
   const now = new Date();
 
-  const result = await usersCollection.updateOne(
-    buildUserIdFilter(userId),
-    {
-      $set: {
-        lastRunAt: now,
-      },
-    }
-  );
+  const result = await usersCollection.updateOne(buildUserIdFilter(userId), {
+    $set: {
+      lastRunAt: now,
+    },
+  });
 
   if (result.matchedCount !== 1) {
     throw new Error(`Unable to update lastRunAt for user ${userId}`);
@@ -575,11 +554,7 @@ async function updateLastRunAt(userId) {
 async function ensureTelegramConnection(user, userId) {
   let cached = connections.get(userId);
 
-  if (
-    cached &&
-    cached.sessionId === user.sessionId &&
-    cached.connection
-  ) {
+  if (cached && cached.sessionId === user.sessionId && cached.connection) {
     try {
       // GramJS exposes connected state through connected.
       if (cached.connection.connected) {
@@ -622,26 +597,28 @@ async function myFunction(window, connection, user) {
 
   if (typeof template.message !== "string") {
     throw new Error(
-      `Template ${window.templateId} does not contain a valid message`
+      `Template ${window.templateId} does not contain a valid message`,
     );
   }
 
-  console.log(
-    `Executing myFunction for ${user.username ?? user._id}`
-  );
+  console.log(`Executing myFunction for ${user.username ?? user._id}`);
+
+  let message = template.message.replace(/\/n/g, "\n");
+
+  for (const [key, value] of Object.entries(template.fields)) {
+    message = message.replaceAll(`{${key}}`, value);
+  }
 
   // IMPORTANT: await the actual Telegram operation.
   // If it fails, this function throws and lastRunAt is NOT updated.
   await sendTelegramMessage(
     window.groupId,
     window.topicId,
-    template.message,
-    connection.connection
+    message,
+    connection.connection,
   );
 
-  console.log(
-    `Function completed for ${user.username ?? user._id}`
-  );
+  console.log(`Function completed for ${user.username ?? user._id}`);
 }
 
 // ======================================================
@@ -682,7 +659,7 @@ async function executeWindow(window) {
   } catch (error) {
     console.error(
       `Unable to initialize Telegram connection for ${userId}:`,
-      error
+      error,
     );
 
     return {
@@ -705,7 +682,7 @@ async function executeWindow(window) {
     windows: [window],
     now: new Date(),
     refreshData: false,
-    randomize: false,
+    randomize: true,
   });
 
   const candidate = calculation.runs[0];
@@ -726,14 +703,10 @@ async function executeWindow(window) {
     console.log(`User ${user.username ?? userId} is not due yet.`);
     console.log(
       `Last run: ${
-        user.lastRunAt
-          ? new Date(user.lastRunAt).toLocaleString()
-          : "Never"
-      }`
+        user.lastRunAt ? new Date(user.lastRunAt).toLocaleString() : "Never"
+      }`,
     );
-    console.log(
-      `Next allowed run: ${candidate.runAt.toLocaleString()}`
-    );
+    console.log(`Next allowed run: ${candidate.runAt.toLocaleString()}`);
 
     return {
       status: "NOT_DUE",
@@ -761,7 +734,7 @@ async function executeWindow(window) {
 
     console.log(
       `lastRunAt updated for ${user.username ?? userId}: ` +
-        `${actualRunTime.toLocaleString()}`
+        `${actualRunTime.toLocaleString()}`,
     );
 
     // Refresh all required data after every successful execution.
@@ -777,10 +750,7 @@ async function executeWindow(window) {
       actualRunTime,
     };
   } catch (error) {
-    console.error(
-      `Execution failed for ${user.username ?? userId}:`,
-      error
-    );
+    console.error(`Execution failed for ${user.username ?? userId}:`, error);
 
     // lastRunAt is intentionally NOT updated on failure.
     return {
@@ -841,9 +811,7 @@ async function calculateNextRun(options = {}) {
     await initializeActiveUsers();
   }
 
-  const activeWindows =
-    suppliedWindows ??
-    getActiveWindows(schedule, now);
+  const activeWindows = suppliedWindows ?? getActiveWindows(schedule, now);
 
   if (activeWindows.length === 0) {
     const nextWindow = getNextWindowStart(schedule, now);
@@ -879,7 +847,7 @@ async function calculateNextRun(options = {}) {
     let candidate = getNextAllowedRun(
       user.lastRunAt,
       schedule,
-      randomDelayMinutes
+      randomDelayMinutes,
     );
 
     // First execution is eligible immediately.
@@ -941,7 +909,7 @@ function scheduleNextRun(date) {
 
   console.log(
     `Next scheduler run: ${date.toLocaleString()} ` +
-      `(in ${Math.ceil(delay / 1000)} seconds)`
+      `(in ${Math.ceil(delay / 1000)} seconds)`,
   );
 
   timeout = setTimeout(() => {
@@ -976,14 +944,14 @@ async function runScheduler() {
         schedule,
         now: new Date(),
         refreshData: false,
-        randomize: false,
+        randomize: true,
       });
 
       // No active-window execution is possible right now.
       if (calculation.type === "WINDOW") {
         console.log(
           `No executable run in the current window. ` +
-            `Next window: ${calculation.date.toLocaleString()}`
+            `Next window: ${calculation.date.toLocaleString()}`,
         );
 
         scheduleNextRun(calculation.date);
@@ -993,10 +961,7 @@ async function runScheduler() {
       const nextRun = calculation.runs[0];
 
       if (!nextRun) {
-        const nextWindow = getNextWindowStart(
-          schedule,
-          new Date()
-        );
+        const nextWindow = getNextWindowStart(schedule, new Date());
 
         scheduleNextRun(nextWindow);
         return;
@@ -1042,7 +1007,7 @@ async function runScheduler() {
         // Retry through the scheduler after one minute.
         console.error(
           `Execution failed; lastRunAt was not updated. ` +
-            `Retrying scheduler in one minute.`
+            `Retrying scheduler in one minute.`,
         );
 
         scheduleNextRun(new Date(Date.now() + 60 * 1000));
@@ -1078,7 +1043,7 @@ async function start() {
     // Calculate and start from the exact next eligible execution.
     const calculation = await calculateNextRun({
       refreshData: true,
-      randomize: false,
+      randomize: true,
     });
 
     if (calculation.type === "RUN") {
@@ -1117,14 +1082,9 @@ export async function loginTelegram(sessionId, appId, appHash) {
 
     const stringSession = new StringSession(sessionId);
 
-    client = new TelegramClient(
-      stringSession,
-      Number(appId),
-      appHash,
-      {
-        connectionRetries: 5,
-      }
-    );
+    client = new TelegramClient(stringSession, Number(appId), appHash, {
+      connectionRetries: 5,
+    });
 
     await client.connect();
 
@@ -1135,7 +1095,7 @@ export async function loginTelegram(sessionId, appId, appHash) {
     if (!status) {
       console.error(
         "Telegram session is not authorized. " +
-          "The sessionId stored in MongoDB must be a valid authorized session."
+          "The sessionId stored in MongoDB must be a valid authorized session.",
       );
 
       await disconnectTelegramClient(client);
@@ -1172,11 +1132,7 @@ export async function assignGroups(client) {
   for (const dialog of dialogs) {
     const chat = dialog.entity;
 
-    if (
-      chat?.className === "Channel" &&
-      chat.megagroup &&
-      chat.forum
-    ) {
+    if (chat?.className === "Channel" && chat.megagroup && chat.forum) {
       try {
         const topicsResult = await client.invoke(
           new Api.channels.GetForumTopics({
@@ -1185,7 +1141,7 @@ export async function assignGroups(client) {
             offsetId: 0,
             offsetTopic: 0,
             limit: 100,
-          })
+          }),
         );
 
         groups.push({
@@ -1195,7 +1151,7 @@ export async function assignGroups(client) {
       } catch (error) {
         console.error(
           `Unable to fetch forum topics for ${chat.title ?? "unknown channel"}:`,
-          error
+          error,
         );
       }
     }
@@ -1211,12 +1167,7 @@ export async function assignGroups(client) {
 // function failed and does NOT update lastRunAt.
 // ======================================================
 
-export async function sendTelegramMessage(
-  groupId,
-  topicId,
-  message,
-  client
-) {
+export async function sendTelegramMessage(groupId, topicId, message, client) {
   if (!client) {
     throw new Error("Telegram client is required");
   }
@@ -1235,11 +1186,7 @@ export async function sendTelegramMessage(
     };
 
     // Preserve topic behavior when topicId is configured.
-    if (
-      topicId !== undefined &&
-      topicId !== null &&
-      topicId !== ""
-    ) {
+    if (topicId !== undefined && topicId !== null && topicId !== "") {
       const numericTopicId = Number(topicId);
 
       if (!Number.isFinite(numericTopicId)) {
@@ -1255,7 +1202,7 @@ export async function sendTelegramMessage(
   } catch (error) {
     console.error(
       `Telegram message failed for group ${groupId}, topic ${topicId}:`,
-      error
+      error,
     );
 
     throw error;
